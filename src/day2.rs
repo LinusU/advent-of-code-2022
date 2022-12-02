@@ -30,6 +30,19 @@ impl FromStr for Shape {
     }
 }
 
+impl FromStr for Outcome {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "X" => Ok(Outcome::Lose),
+            "Y" => Ok(Outcome::Draw),
+            "Z" => Ok(Outcome::Win),
+            _ => panic!("Invalid outcome"),
+        }
+    }
+}
+
 impl Shape {
     fn outcome(&self, other: &Shape) -> Outcome {
         match (self, other) {
@@ -78,5 +91,38 @@ pub fn part1(input: &str) -> u64 {
             };
 
             acc + player.score() + player.outcome(opponent).score()
+        })
+}
+
+#[aoc(day2, part2)]
+pub fn part2(input: &str) -> u64 {
+    input
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .chunks_exact(2)
+        .map(|line| {
+            let [opponent, outcome] = line else {
+                panic!("Invalid input")
+            };
+
+            (
+                opponent.parse::<Shape>().unwrap(),
+                outcome.parse::<Outcome>().unwrap(),
+            )
+        })
+        .fold(0, |acc, (opponent, outcome)| {
+            let player = match (&opponent, &outcome) {
+                (Shape::Rock, Outcome::Lose) => Shape::Scissors,
+                (Shape::Rock, Outcome::Draw) => Shape::Rock,
+                (Shape::Rock, Outcome::Win) => Shape::Paper,
+                (Shape::Paper, Outcome::Lose) => Shape::Rock,
+                (Shape::Paper, Outcome::Draw) => Shape::Paper,
+                (Shape::Paper, Outcome::Win) => Shape::Scissors,
+                (Shape::Scissors, Outcome::Lose) => Shape::Paper,
+                (Shape::Scissors, Outcome::Draw) => Shape::Scissors,
+                (Shape::Scissors, Outcome::Win) => Shape::Rock,
+            };
+
+            acc + player.score() + player.outcome(&opponent).score()
         })
 }
