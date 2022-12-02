@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::str::FromStr;
 
 use aoc_runner_derive::aoc;
@@ -81,16 +82,10 @@ impl Outcome {
 pub fn part1(input: &str) -> u64 {
     input
         .split_whitespace()
-        .map(|s| s.parse::<Shape>())
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap()
-        .chunks_exact(2)
-        .fold(0, |acc, shapes| {
-            let [opponent, player] = shapes else {
-                panic!("Invalid input")
-            };
-
-            acc + player.score() + player.outcome(opponent).score()
+        .map(|s| s.parse::<Shape>().unwrap())
+        .tuples()
+        .fold(0, |acc, (opponent, player)| {
+            acc + player.score() + player.outcome(&opponent).score()
         })
 }
 
@@ -98,13 +93,8 @@ pub fn part1(input: &str) -> u64 {
 pub fn part2(input: &str) -> u64 {
     input
         .split_whitespace()
-        .collect::<Vec<_>>()
-        .chunks_exact(2)
-        .map(|line| {
-            let [opponent, outcome] = line else {
-                panic!("Invalid input")
-            };
-
+        .tuples()
+        .map(|(opponent, outcome)| {
             (
                 opponent.parse::<Shape>().unwrap(),
                 outcome.parse::<Outcome>().unwrap(),
