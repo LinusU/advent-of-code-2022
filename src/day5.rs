@@ -1,6 +1,31 @@
-use std::num::ParseIntError;
+use std::{num::ParseIntError, str::FromStr};
 
 use aoc_runner_derive::aoc;
+
+struct Instruction {
+    n: usize,
+    from: usize,
+    to: usize,
+}
+
+impl FromStr for Instruction {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut words = s.split_whitespace();
+
+        assert!(words.next().unwrap() == "move");
+        let n = words.next().unwrap().parse::<usize>()?;
+
+        assert!(words.next().unwrap() == "from");
+        let from = words.next().unwrap().parse::<usize>()? - 1;
+
+        assert!(words.next().unwrap() == "to");
+        let to = words.next().unwrap().parse::<usize>()? - 1;
+
+        Ok(Instruction { n, from, to })
+    }
+}
 
 #[aoc(day5, part1)]
 pub fn part1(input: &str) -> Result<String, ParseIntError> {
@@ -40,21 +65,12 @@ pub fn part1(input: &str) -> Result<String, ParseIntError> {
     }
 
     for instruction in lines {
-        let mut words = instruction.split_whitespace();
+        let instruction = instruction.parse::<Instruction>()?;
 
-        assert!(words.next().unwrap() == "move");
-        let len = words.next().unwrap().parse::<usize>()?;
+        for _ in 0..instruction.n {
+            let c = stacks[instruction.from].pop().unwrap();
 
-        assert!(words.next().unwrap() == "from");
-        let from = words.next().unwrap().parse::<usize>()?;
-
-        assert!(words.next().unwrap() == "to");
-        let to = words.next().unwrap().parse::<usize>()?;
-
-        for _ in 0..len {
-            let c = stacks[from - 1].pop().unwrap();
-
-            stacks[to - 1].push(c);
+            stacks[instruction.to].push(c);
         }
     }
 
