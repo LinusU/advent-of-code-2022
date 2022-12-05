@@ -101,3 +101,22 @@ pub fn part1(input: &str) -> Result<String, ParseIntError> {
 
     Ok(result)
 }
+
+#[aoc(day5, part2)]
+pub fn part2(input: &str) -> Result<String, ParseIntError> {
+    let split_pos = input.find("\n\n").unwrap() + 2;
+    let (ship, instructions) = input.split_at(split_pos);
+
+    let mut ship = ship.parse::<Ship>()?;
+
+    for instruction in instructions.lines() {
+        let instruction = instruction.parse::<Instruction>()?;
+
+        let from_len = ship.stacks[instruction.from].len();
+        let boxes = ship.stacks[instruction.from].split_off(from_len - instruction.n);
+
+        ship.stacks[instruction.to].extend(boxes);
+    }
+
+    Ok(ship.result())
+}
