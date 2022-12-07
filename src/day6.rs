@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, HashSet};
+use std::collections::{HashSet, VecDeque};
 
 use aoc_runner_derive::aoc;
 use itertools::Itertools;
@@ -109,7 +109,6 @@ mod tests {
         let result = super::part1("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw");
         assert_eq!(result, 11);
     }
-
 
     #[test]
     fn test_case_6() {
