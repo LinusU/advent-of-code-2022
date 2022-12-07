@@ -91,11 +91,38 @@ pub fn part1(input: &str) -> Result<u64, ParseIntError> {
     Ok(result)
 }
 
+#[aoc(day7, part2)]
+pub fn part2(input: &str) -> Result<u64, ParseIntError> {
+    let root = input.parse::<Dir>()?;
+
+    let disk_size = 70_000_000u64;
+    let free_space = disk_size - root.files_size;
+
+    let target_space = 30_000_000u64;
+    let need_to_free = target_space - free_space;
+
+    let mut result = target_space;
+
+    root.visit_all(&mut |dir| {
+        if dir.files_size >= need_to_free && result > dir.files_size {
+            result = dir.files_size;
+        }
+    });
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_case_1() {
         let result = super::part1("$ cd /\n$ ls\ndir a\n14848514 b.txt\n8504156 c.dat\ndir d\n$ cd a\n$ ls\ndir e\n29116 f\n2557 g\n62596 h.lst\n$ cd e\n$ ls\n584 i\n$ cd ..\n$ cd ..\n$ cd d\n$ ls\n4060174 j\n8033020 d.log\n5626152 d.ext\n7214296 k");
         assert_eq!(result, Ok(95437));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("$ cd /\n$ ls\ndir a\n14848514 b.txt\n8504156 c.dat\ndir d\n$ cd a\n$ ls\ndir e\n29116 f\n2557 g\n62596 h.lst\n$ cd e\n$ ls\n584 i\n$ cd ..\n$ cd ..\n$ cd d\n$ ls\n4060174 j\n8033020 d.log\n5626152 d.ext\n7214296 k");
+        assert_eq!(result, Ok(24933642));
     }
 }
