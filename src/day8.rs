@@ -50,6 +50,17 @@ impl Forest {
             .skip(row * self.width)
             .take(self.width)
     }
+
+    fn iter_pos(&self) -> impl DoubleEndedIterator<Item = (usize, usize)> + '_ {
+        (0..self.height()).flat_map(|y| (0..self.width()).map(move |x| (x, y)))
+    }
+
+    fn get(&self, x: usize, y: usize) -> &Tree {
+        assert!(x < self.width());
+        assert!(y < self.height());
+
+        &self.trees[y * self.width + x]
+    }
 }
 
 impl FromStr for Forest {
@@ -117,11 +128,68 @@ pub fn part1(input: &str) -> Result<u64, ParseIntError> {
     Ok(forest.iter().map(|t| t.visible as u64).sum())
 }
 
+#[aoc(day8, part2)]
+pub fn part2(input: &str) -> Result<u64, ParseIntError> {
+    let forest = input.parse::<Forest>()?;
+
+    let width = forest.width();
+    let height = forest.height();
+
+    Ok(forest
+        .iter_pos()
+        .map(|(x, y)| {
+            let house_height = forest.get(x, y).height;
+            let mut score = (0u64, 0u64, 0u64, 0u64);
+
+            for delta in 1..=x {
+                score.0 += 1;
+
+                if forest.get(x - delta, y).height >= house_height {
+                    break;
+                }
+            }
+
+            for delta in 1..(width - x) {
+                score.1 += 1;
+
+                if forest.get(x + delta, y).height >= house_height {
+                    break;
+                }
+            }
+
+            for delta in 1..=y {
+                score.2 += 1;
+
+                if forest.get(x, y - delta).height >= house_height {
+                    break;
+                }
+            }
+
+            for delta in 1..(height - y) {
+                score.3 += 1;
+
+                if forest.get(x, y + delta).height >= house_height {
+                    break;
+                }
+            }
+
+            score.0 * score.1 * score.2 * score.3
+        })
+        .max()
+        .unwrap_or(0))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_case_1() {
         let result = super::part1("30373\n25512\n65332\n33549\n35390");
         assert_eq!(result, Ok(21));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("30373\n25512\n65332\n33549\n35390");
+        assert_eq!(result, Ok(8));
     }
 }
