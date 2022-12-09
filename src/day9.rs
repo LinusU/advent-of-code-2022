@@ -84,11 +84,62 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     Ok(visited.len())
 }
 
+#[aoc(day9, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let moves = input
+        .lines()
+        .map(|s| s.parse::<Move>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut visited = HashSet::<(i32, i32)>::new();
+
+    let mut rope = vec![(0, 0); 10];
+
+    visited.insert(rope[9]);
+
+    for m in moves {
+        let distance = m.distance();
+        let (dx, dy) = m.direction();
+
+        for _ in 0..distance {
+            rope[0].0 += dx;
+            rope[0].1 += dy;
+
+            for i in 1..10 {
+                let touching = cmp::max((rope[i - 1].0 - rope[i].0).abs(), (rope[i - 1].1 - rope[i].1).abs()) <= 1;
+
+                if touching {
+                    continue;
+                }
+
+                rope[i].0 += (rope[i - 1].0 - rope[i].0).signum();
+                rope[i].1 += (rope[i - 1].1 - rope[i].1).signum();
+            }
+
+            visited.insert(rope[9]);
+        }
+    }
+
+    Ok(visited.len())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_case_1() {
         let result = super::part1("R 4\nU 4\nL 3\nD 1\nR 4\nD 1\nL 5\nR 2\n");
         assert_eq!(result, Ok(13));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("R 4\nU 4\nL 3\nD 1\nR 4\nD 1\nL 5\nR 2\n");
+        assert_eq!(result, Ok(1));
+    }
+
+    #[test]
+    fn test_case_3() {
+        let result = super::part2("R 5\nU 8\nL 8\nD 3\nR 17\nD 10\nL 25\nU 20\n");
+        assert_eq!(result, Ok(36));
     }
 }
