@@ -106,7 +106,10 @@ pub fn part2(input: &str) -> Result<usize, ParseIntError> {
             rope[0].1 += dy;
 
             for i in 1..10 {
-                let touching = cmp::max((rope[i - 1].0 - rope[i].0).abs(), (rope[i - 1].1 - rope[i].1).abs()) <= 1;
+                let touching = cmp::max(
+                    (rope[i - 1].0 - rope[i].0).abs(),
+                    (rope[i - 1].1 - rope[i].1).abs(),
+                ) <= 1;
 
                 if touching {
                     continue;
