@@ -1,16 +1,16 @@
-use std::{cmp::Reverse, num::ParseIntError, str::FromStr};
+use std::{cmp::Reverse, collections::HashSet, num::ParseIntError, str::FromStr};
 
 use aoc_runner_derive::aoc;
 
 #[derive(Debug)]
 enum Operation {
-    Add(i32),
-    Multiply(i32),
+    Add(u64),
+    Multiply(u64),
     Square,
 }
 
 impl Operation {
-    fn apply(&self, x: i32) -> i32 {
+    fn apply(&self, x: u64) -> u64 {
         match self {
             Self::Add(y) => x + y,
             Self::Multiply(y) => x * y,
@@ -41,11 +41,11 @@ impl FromStr for Operation {
 
 #[derive(Debug)]
 enum Test {
-    DivisibleBy(i32),
+    DivisibleBy(u64),
 }
 
 impl Test {
-    fn test(&self, x: i32) -> bool {
+    fn test(&self, x: u64) -> bool {
         match self {
             Self::DivisibleBy(y) => x % y == 0,
         }
@@ -66,7 +66,7 @@ impl FromStr for Test {
 
 #[derive(Debug)]
 struct Monkey {
-    items: Vec<i32>,
+    items: Vec<u64>,
     op: Operation,
     test: Test,
     true_target: usize,
@@ -75,7 +75,7 @@ struct Monkey {
 }
 
 impl Monkey {
-    fn target(&self, item: i32) -> usize {
+    fn target(&self, item: u64) -> usize {
         if self.test.test(item) {
             self.true_target
         } else {
@@ -87,19 +87,19 @@ impl Monkey {
 trait Parsing {
     type Err;
 
-    fn parse_starting_items(&self) -> Result<Vec<i32>, Self::Err>;
+    fn parse_starting_items(&self) -> Result<Vec<u64>, Self::Err>;
     fn parse_target(&self) -> Result<usize, Self::Err>;
 }
 
 impl Parsing for str {
     type Err = ParseIntError;
 
-    fn parse_starting_items(&self) -> Result<Vec<i32>, Self::Err> {
+    fn parse_starting_items(&self) -> Result<Vec<u64>, Self::Err> {
         let Some(items) = self.trim().strip_prefix("Starting items: ") else {
             panic!("Malformed input");
         };
 
-        items.split(',').map(|s| s.trim().parse::<i32>()).collect()
+        items.split(',').map(|s| s.trim().parse::<u64>()).collect()
     }
 
     fn parse_target(&self) -> Result<usize, Self::Err> {
@@ -132,6 +132,14 @@ impl FromStr for Monkey {
     }
 }
 
+fn monkey_business(monkeys: &[Monkey]) -> u64 {
+    let mut inspected = monkeys.iter().map(|m| m.inspected).collect::<Vec<_>>();
+
+    inspected.sort_by_key(|w| Reverse(*w));
+
+    inspected[0] * inspected[1]
+}
+
 #[aoc(day11, part1)]
 pub fn part1(input: &str) -> Result<u64, ParseIntError> {
     let mut monkeys = input
@@ -153,11 +161,40 @@ pub fn part1(input: &str) -> Result<u64, ParseIntError> {
         }
     }
 
-    let mut inspected = monkeys.iter().map(|m| m.inspected).collect::<Vec<_>>();
+    Ok(monkey_business(&monkeys))
+}
 
-    inspected.sort_by_key(|w| Reverse(*w));
+#[aoc(day11, part2)]
+pub fn part2(input: &str) -> Result<u64, ParseIntError> {
+    let mut monkeys = input
+        .split("\n\n")
+        .map(|input| input.parse::<Monkey>())
+        .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(inspected[0] * inspected[1])
+    let max_value = monkeys
+        .iter()
+        .map(|m| match m.test {
+            Test::DivisibleBy(x) => x,
+        })
+        .collect::<HashSet<_>>()
+        .iter()
+        .product::<u64>();
+
+    for _ in 0..10000 {
+        for source in 0..monkeys.len() {
+            let queue = std::mem::take(&mut monkeys[source].items);
+
+            for item in queue {
+                let item = monkeys[source].op.apply(item) % max_value;
+                let target = monkeys[source].target(item);
+
+                monkeys[source].inspected += 1;
+                monkeys[target].items.push(item);
+            }
+        }
+    }
+
+    Ok(monkey_business(&monkeys))
 }
 
 #[cfg(test)]
@@ -166,5 +203,11 @@ mod tests {
     fn test_case_1() {
         let result = super::part1("Monkey 0:\n  Starting items: 79, 98\n  Operation: new = old * 19\n  Test: divisible by 23\n    If true: throw to monkey 2\n    If false: throw to monkey 3\n\nMonkey 1:\n  Starting items: 54, 65, 75, 74\n  Operation: new = old + 6\n  Test: divisible by 19\n    If true: throw to monkey 2\n    If false: throw to monkey 0\n\nMonkey 2:\n  Starting items: 79, 60, 97\n  Operation: new = old * old\n  Test: divisible by 13\n    If true: throw to monkey 1\n    If false: throw to monkey 3\n\nMonkey 3:\n  Starting items: 74\n  Operation: new = old + 3\n  Test: divisible by 17\n    If true: throw to monkey 0\n    If false: throw to monkey 1");
         assert_eq!(result, Ok(10605));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("Monkey 0:\n  Starting items: 79, 98\n  Operation: new = old * 19\n  Test: divisible by 23\n    If true: throw to monkey 2\n    If false: throw to monkey 3\n\nMonkey 1:\n  Starting items: 54, 65, 75, 74\n  Operation: new = old + 6\n  Test: divisible by 19\n    If true: throw to monkey 2\n    If false: throw to monkey 0\n\nMonkey 2:\n  Starting items: 79, 60, 97\n  Operation: new = old * old\n  Test: divisible by 13\n    If true: throw to monkey 1\n    If false: throw to monkey 3\n\nMonkey 3:\n  Starting items: 74\n  Operation: new = old + 3\n  Test: divisible by 17\n    If true: throw to monkey 0\n    If false: throw to monkey 1");
+        assert_eq!(result, Ok(2713310158));
     }
 }
