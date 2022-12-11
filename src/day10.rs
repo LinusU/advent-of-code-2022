@@ -27,6 +27,7 @@ struct Cpu {
     cycle: usize,
     reg_x: i32,
     part_1_result: i32,
+    part_2_result: String,
 }
 
 impl Cpu {
@@ -35,6 +36,7 @@ impl Cpu {
             cycle: 0,
             reg_x: 1,
             part_1_result: 0,
+            part_2_result: String::with_capacity(41 * 6),
         }
     }
 
@@ -43,6 +45,18 @@ impl Cpu {
 
         if self.cycle % 40 == 20 {
             self.part_1_result += (self.cycle as i32) * self.reg_x;
+        }
+
+        let pos = ((self.cycle as i32) - 1) % 40;
+
+        if pos == 0 {
+            self.part_2_result.push('\n');
+        }
+
+        if self.reg_x >= pos - 1 && self.reg_x <= pos + 1 {
+            self.part_2_result.push('#');
+        } else {
+            self.part_2_result.push('.');
         }
     }
 
@@ -69,6 +83,19 @@ pub fn part1(input: &str) -> Result<i32, ParseIntError> {
     }
 
     Ok(cpu.part_1_result)
+}
+
+#[aoc(day10, part2)]
+pub fn part2(input: &str) -> Result<String, ParseIntError> {
+    let instructions = input.lines().map(|line| line.parse::<Instruction>());
+
+    let mut cpu = Cpu::new();
+
+    for instruction in instructions {
+        cpu.run(&instruction?);
+    }
+
+    Ok(cpu.part_2_result)
 }
 
 #[cfg(test)]
