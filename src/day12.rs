@@ -54,34 +54,26 @@ impl<'a> HeightMap<'a> {
         }
     }
 
-    fn reachable_neighbors(
-        &'a self,
-        (x, y): (usize, usize),
-    ) -> impl Iterator<Item = (usize, usize)> {
+    fn neighbors(&'a self, (x, y): (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
         let mut result = Vec::new();
 
         if x > 0 {
-            result.push(((x - 1, y), self.get((x - 1, y))));
+            result.push((x - 1, y));
         }
 
         if x < self.width() - 1 {
-            result.push(((x + 1, y), self.get((x + 1, y))));
+            result.push((x + 1, y));
         }
 
         if y > 0 {
-            result.push(((x, y - 1), self.get((x, y - 1))));
+            result.push((x, y - 1));
         }
 
         if y < self.height() - 1 {
-            result.push(((x, y + 1), self.get((x, y + 1))));
+            result.push((x, y + 1));
         }
 
-        let max_height = self.get((x, y)) + 1;
-
-        result
-            .into_iter()
-            .filter(move |&(_, height)| height <= max_height)
-            .map(|(pos, _)| pos)
+        result.into_iter()
     }
 }
 
@@ -95,8 +87,47 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     visited.insert(map.start);
 
     while let Some((pos, cost)) = queue.pop_front() {
-        for neighbor in map.reachable_neighbors(pos) {
+        let max_height = map.get(pos) + 1;
+
+        for neighbor in map.neighbors(pos) {
+            if map.get(neighbor) > max_height {
+                continue;
+            }
+
             if neighbor == map.end {
+                return Ok(cost + 1);
+            }
+
+            if !visited.contains(&neighbor) {
+                queue.push_back((neighbor, cost + 1));
+                visited.insert(neighbor);
+            }
+        }
+    }
+
+    panic!("No path found");
+}
+
+#[aoc(day12, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let map = HeightMap::new(input);
+    let mut queue = VecDeque::new();
+    let mut visited = HashSet::new();
+
+    queue.push_back((map.end, 0));
+    visited.insert(map.end);
+
+    while let Some((pos, cost)) = queue.pop_front() {
+        let min_height = map.get(pos) - 1;
+
+        for neighbor in map.neighbors(pos) {
+            let height = map.get(neighbor);
+
+            if height < min_height {
+                continue;
+            }
+
+            if height == b'a' {
                 return Ok(cost + 1);
             }
 
@@ -116,5 +147,11 @@ mod tests {
     fn test_case_1() {
         let result = super::part1("Sabqponm\nabcryxxl\naccszExk\nacctuvwj\nabdefghi");
         assert_eq!(result, Ok(31));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("Sabqponm\nabcryxxl\naccszExk\nacctuvwj\nabdefghi");
+        assert_eq!(result, Ok(29));
     }
 }
