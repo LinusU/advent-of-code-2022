@@ -12,6 +12,7 @@ use nom::{
     IResult,
 };
 
+#[derive(Clone)]
 enum Value {
     List(Vec<Value>),
     Number(u64),
@@ -51,6 +52,8 @@ impl PartialEq for Value {
     }
 }
 
+impl Eq for Value {}
+
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
@@ -63,6 +66,12 @@ impl PartialOrd for Value {
                 vec![Value::Number(*left)].partial_cmp(right)
             }
         }
+    }
+}
+
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
     }
 }
 
@@ -124,11 +133,36 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     Ok(result)
 }
 
+#[aoc(day13, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let start_packet = vec![Value::List(vec![Value::Number(2)])];
+    let end_packet = vec![Value::List(vec![Value::Number(6)])];
+
+    let mut packets = input
+        .split_whitespace()
+        .map(|s| parse_value_list(s).unwrap().1)
+        .chain(vec![start_packet.clone(), end_packet.clone()])
+        .collect::<Vec<_>>();
+
+    packets.sort();
+
+    let start_pos = packets.iter().position(|p| p == &start_packet).unwrap() + 1;
+    let end_pos = packets.iter().position(|p| p == &end_packet).unwrap() + 1;
+
+    Ok(start_pos * end_pos)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_case_1() {
         let result = super::part1("[1,1,3,1,1]\n[1,1,5,1,1]\n\n[[1],[2,3,4]]\n[[1],4]\n\n[9]\n[[8,7,6]]\n\n[[4,4],4,4]\n[[4,4],4,4,4]\n\n[7,7,7,7]\n[7,7,7]\n\n[]\n[3]\n\n[[[]]]\n[[]]\n\n[1,[2,[3,[4,[5,6,7]]]],8,9]\n[1,[2,[3,[4,[5,6,0]]]],8,9]");
         assert_eq!(result, Ok(13));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("[1,1,3,1,1]\n[1,1,5,1,1]\n\n[[1],[2,3,4]]\n[[1],4]\n\n[9]\n[[8,7,6]]\n\n[[4,4],4,4]\n[[4,4],4,4,4]\n\n[7,7,7,7]\n[7,7,7]\n\n[]\n[3]\n\n[[[]]]\n[[]]\n\n[1,[2,[3,[4,[5,6,7]]]],8,9]\n[1,[2,[3,[4,[5,6,0]]]],8,9]");
+        assert_eq!(result, Ok(140));
     }
 }
