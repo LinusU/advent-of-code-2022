@@ -126,39 +126,22 @@ pub fn part1(input: &str) -> Result<u32, ParseIntError> {
 #[aoc(day14, part2)]
 pub fn part2(input: &str) -> Result<u32, ParseIntError> {
     let mut cave = input.parse::<Cave>()?;
+    let mut stack = vec![Coord { x: 500, y: 0 }];
 
-    loop {
-        let mut sand = Coord { x: 500, y: 0 };
+    while let Some(sand) = stack.pop() {
+        for dx in -1..=1 {
+            if cave.is_free(sand.add(dx, 1)) {
+                cave.insert_sand(sand.add(dx, 1));
 
-        if !cave.is_free(sand) {
-            return Ok(cave.sand_count);
-        }
-
-        loop {
-            if sand.y > cave.max_y {
-                cave.insert_sand(sand);
-                break;
+                if sand.y != cave.max_y {
+                    stack.push(sand.add(dx, 1));
+                }
             }
-
-            if cave.is_free(sand.add(0, 1)) {
-                sand = sand.add(0, 1);
-                continue;
-            }
-
-            if cave.is_free(sand.add(-1, 1)) {
-                sand = sand.add(-1, 1);
-                continue;
-            }
-
-            if cave.is_free(sand.add(1, 1)) {
-                sand = sand.add(1, 1);
-                continue;
-            }
-
-            cave.insert_sand(sand);
-            break;
         }
     }
+
+    // Add one extra for the spawn point
+    Ok(cave.sand_count + 1)
 }
 
 #[cfg(test)]
