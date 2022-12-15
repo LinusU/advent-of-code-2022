@@ -33,6 +33,39 @@ impl FromStr for Coord {
     }
 }
 
+trait MergeRanges {
+    fn merge(&mut self);
+}
+
+impl MergeRanges for Vec<RangeInclusive<i32>> {
+    fn merge(&mut self) {
+        assert!(!self.is_empty());
+
+        self.sort_by(|lhs, rhs| match lhs.start().cmp(rhs.start()) {
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Less => Ordering::Less,
+            Ordering::Equal => lhs.end().cmp(rhs.end()),
+        });
+
+        let mut idx = 1;
+
+        while idx < self.len() {
+            if *self[idx].start() > (self[idx - 1].end() + 1) {
+                idx += 1;
+                continue;
+            }
+
+            let new = RangeInclusive::new(
+                *self[idx - 1].start(),
+                *self[idx].end().max(self[idx - 1].end()),
+            );
+
+            self[idx - 1] = new;
+            self.remove(idx);
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Sensor {
     closest_beacon: Coord,
@@ -79,31 +112,7 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
         })
         .collect::<Vec<_>>();
 
-    ranges.sort_by(|lhs, rhs| match lhs.start().cmp(rhs.start()) {
-        Ordering::Greater => Ordering::Greater,
-        Ordering::Less => Ordering::Less,
-        Ordering::Equal => lhs.end().cmp(rhs.end()),
-    });
-
-    let ranges = ranges.into_iter().fold(vec![], |mut mem, item| {
-        let Some(prev) = mem.pop() else {
-            mem.push(item);
-            return mem;
-        };
-
-        if *item.start() > (prev.end() + 1) {
-            mem.push(prev);
-            mem.push(item);
-            return mem;
-        }
-
-        mem.push(RangeInclusive::new(
-            *prev.start(),
-            *item.end().max(prev.end()),
-        ));
-
-        mem
-    });
+    ranges.merge();
 
     let beacons_in_target = sensors
         .iter()
