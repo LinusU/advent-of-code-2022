@@ -8,6 +8,11 @@ const TARGET_Y: i32 = 10;
 #[cfg(not(test))]
 const TARGET_Y: i32 = 2000000;
 
+#[cfg(test)]
+const MAX_POS: i32 = 20;
+#[cfg(not(test))]
+const MAX_POS: i32 = 4000000;
+
 #[derive(Debug)]
 struct Coord {
     x: i32,
@@ -131,11 +136,74 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     Ok(scanned_positions - beacons_in_target)
 }
 
+#[aoc(day15, part2)]
+pub fn part2(input: &str) -> Result<u64, ParseIntError> {
+    let sensors = input
+        .lines()
+        .map(|line| line.parse::<Sensor>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    for y in 0..=MAX_POS {
+        let mut ranges = sensors
+            .iter()
+            .filter_map(|sensor| {
+                let reach = sensor.position.distance_to(&sensor.closest_beacon);
+                let dy = sensor.position.y.abs_diff(y);
+
+                if dy > reach {
+                    return None;
+                }
+
+                let start = sensor
+                    .position
+                    .x
+                    .checked_sub_unsigned(reach - dy)
+                    .unwrap()
+                    .max(0);
+
+                if start > MAX_POS {
+                    return None;
+                }
+
+                let end = sensor
+                    .position
+                    .x
+                    .checked_add_unsigned(reach - dy)
+                    .unwrap()
+                    .min(MAX_POS);
+
+                if end < 0 {
+                    return None;
+                }
+
+                Some(RangeInclusive::new(start, end))
+            })
+            .collect::<Vec<_>>();
+
+        ranges.merge();
+
+        if ranges.len() > 1 {
+            let x = (ranges[0].end() + 1) as u64;
+            let y = y as u64;
+
+            return Ok(x * 4000000 + y);
+        }
+    }
+
+    panic!("No hidden beacon found!");
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_case_1() {
         let result = super::part1("Sensor at x=2, y=18: closest beacon is at x=-2, y=15\nSensor at x=9, y=16: closest beacon is at x=10, y=16\nSensor at x=13, y=2: closest beacon is at x=15, y=3\nSensor at x=12, y=14: closest beacon is at x=10, y=16\nSensor at x=10, y=20: closest beacon is at x=10, y=16\nSensor at x=14, y=17: closest beacon is at x=10, y=16\nSensor at x=8, y=7: closest beacon is at x=2, y=10\nSensor at x=2, y=0: closest beacon is at x=2, y=10\nSensor at x=0, y=11: closest beacon is at x=2, y=10\nSensor at x=20, y=14: closest beacon is at x=25, y=17\nSensor at x=17, y=20: closest beacon is at x=21, y=22\nSensor at x=16, y=7: closest beacon is at x=15, y=3\nSensor at x=14, y=3: closest beacon is at x=15, y=3\nSensor at x=20, y=1: closest beacon is at x=15, y=3");
         assert_eq!(result, Ok(26));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("Sensor at x=2, y=18: closest beacon is at x=-2, y=15\nSensor at x=9, y=16: closest beacon is at x=10, y=16\nSensor at x=13, y=2: closest beacon is at x=15, y=3\nSensor at x=12, y=14: closest beacon is at x=10, y=16\nSensor at x=10, y=20: closest beacon is at x=10, y=16\nSensor at x=14, y=17: closest beacon is at x=10, y=16\nSensor at x=8, y=7: closest beacon is at x=2, y=10\nSensor at x=2, y=0: closest beacon is at x=2, y=10\nSensor at x=0, y=11: closest beacon is at x=2, y=10\nSensor at x=20, y=14: closest beacon is at x=25, y=17\nSensor at x=17, y=20: closest beacon is at x=21, y=22\nSensor at x=16, y=7: closest beacon is at x=15, y=3\nSensor at x=14, y=3: closest beacon is at x=15, y=3\nSensor at x=20, y=1: closest beacon is at x=15, y=3");
+        assert_eq!(result, Ok(56000011));
     }
 }
