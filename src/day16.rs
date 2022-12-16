@@ -87,7 +87,7 @@ impl FromStr for Valve {
 }
 
 struct Step {
-    open: HashSet<ValveId>,
+    open: HashSet<u8>,
     position: ValveId,
     previous: ValveId,
     score: u64,
@@ -109,7 +109,7 @@ impl Step {
         let time_left = self.time_left - 1;
         let mut open = self.open.clone();
 
-        open.insert(valve.id);
+        open.insert(valve.flow_rate);
 
         Self {
             open,
@@ -129,6 +129,35 @@ impl Step {
             time_left: self.time_left - 1,
         }
     }
+
+    fn is_closed(&self, valve: &Valve) -> bool {
+        !self.open.contains(&valve.flow_rate)
+    }
+
+    fn best(&self, sorted_flow_rates: &[u8]) -> u64 {
+        let mut time_left = self.time_left as u64;
+        let mut score = self.score;
+
+        for &flow_rate in sorted_flow_rates {
+            if self.open.contains(&flow_rate) {
+                continue;
+            }
+
+            time_left -= 1;
+            if time_left == 0 {
+                break;
+            }
+
+            score += (flow_rate as u64) * time_left;
+
+            time_left -= 1;
+            if time_left == 0 {
+                break;
+            }
+        }
+
+        score
+    }
 }
 
 #[aoc(day16, part1)]
@@ -142,6 +171,15 @@ pub fn part1(input: &str) -> Result<u64, ParseIntError> {
         .collect::<HashMap<_, _>>();
 
     let max_open = valves.values().filter(|valve| valve.flow_rate > 0).count();
+
+    let mut sorted_flow_rates = valves
+        .values()
+        .map(|valve| valve.flow_rate)
+        .filter(|&flow_rate| flow_rate > 0)
+        .collect::<Vec<_>>();
+
+    sorted_flow_rates.sort();
+    sorted_flow_rates.reverse();
 
     let mut result = 0;
     let mut queue = vec![Step::new()];
@@ -157,9 +195,13 @@ pub fn part1(input: &str) -> Result<u64, ParseIntError> {
             continue;
         }
 
+        if step.best(&sorted_flow_rates) < result {
+            continue;
+        }
+
         let valve = &valves[&step.position];
 
-        if valve.flow_rate > 0 && !step.open.contains(&valve.id) {
+        if valve.flow_rate > 0 && step.is_closed(valve) {
             queue.push(step.open(valve));
         }
 
