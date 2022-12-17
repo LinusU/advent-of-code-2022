@@ -10,6 +10,16 @@ enum Steam {
     Right = b'>',
 }
 
+impl From<&u8> for Steam {
+    fn from(value: &u8) -> Self {
+        match value {
+            b'<' => Steam::Left,
+            b'>' => Steam::Right,
+            _ => panic!("Invalid input {value}"),
+        }
+    }
+}
+
 struct Board {
     data: Vec<bool>,
 }
@@ -183,12 +193,7 @@ impl Shape {
 #[aoc(day17, part1)]
 pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     let shapes = Shape::all().into_iter().cycle();
-    let mut steam = input
-        .trim()
-        .as_bytes()
-        .iter()
-        .map(|b| unsafe { std::mem::transmute::<u8, Steam>(*b) })
-        .cycle();
+    let mut steam = input.trim().as_bytes().iter().map(Steam::from).cycle();
 
     let mut board = Board::new();
 
