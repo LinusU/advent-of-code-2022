@@ -182,14 +182,13 @@ impl Shape {
     }
 }
 
-#[aoc(day17, part1)]
-pub fn part1(input: &str) -> Result<usize, ParseIntError> {
+fn height_after_n_shapes(input: &str, n_shapes: usize) -> usize {
     let shapes = Shape::all().into_iter().cycle();
     let mut steam = input.trim().as_bytes().iter().map(Steam::from).cycle();
 
     let mut board = Board::new();
 
-    for shape in shapes.take(2022) {
+    for shape in shapes.take(n_shapes) {
         let mut x = 2usize;
         let mut y = board.max_y() + 3;
 
@@ -216,7 +215,102 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
         }
     }
 
-    Ok(board.max_y())
+    board.max_y()
+}
+
+struct CycleInfo {
+    cycle_count: usize,
+    cycle_height: usize,
+    first_cycle_shapes: usize,
+    last_cycle_shapes: usize,
+}
+
+fn get_cycle_info(input: &str, n_shapes: usize) -> CycleInfo {
+    let shapes = Shape::all().into_iter().cycle();
+    let mut steam = input
+        .trim()
+        .as_bytes()
+        .iter()
+        .map(Steam::from)
+        .cycle()
+        .enumerate();
+
+    let mut board = Board::new();
+
+    let mut first_cycle_height = Option::<usize>::None;
+    let mut first_cycle_shapes = Option::<usize>::None;
+
+    for (shape_idx, shape) in shapes.enumerate() {
+        let mut x = 2usize;
+        let mut y = board.max_y() + 3;
+
+        for (steam_idx, steam) in steam.by_ref() {
+            if steam_idx == input.len() {
+                first_cycle_height = Some(board.max_y());
+                first_cycle_shapes = Some(shape_idx);
+            }
+
+            if steam_idx == input.len() * 2 {
+                let first_cycle_height = first_cycle_height.unwrap();
+                let first_cycle_shapes = first_cycle_shapes.unwrap();
+
+                let cycle_height = board.max_y() - first_cycle_height;
+                let cycle_count =
+                    (n_shapes - first_cycle_shapes) / (shape_idx - first_cycle_shapes);
+                let last_cycle_shapes = n_shapes
+                    - (first_cycle_shapes + ((shape_idx - first_cycle_shapes) * cycle_count));
+
+                return CycleInfo {
+                    cycle_count,
+                    cycle_height,
+                    first_cycle_shapes,
+                    last_cycle_shapes,
+                };
+            }
+
+            match steam {
+                Steam::Left => {
+                    if x > 0 && shape.can_be_placed(&board, x - 1, y) {
+                        x -= 1;
+                    }
+                }
+                Steam::Right => {
+                    if shape.can_be_placed(&board, x + 1, y) {
+                        x += 1;
+                    }
+                }
+            }
+
+            if y > 0 && shape.can_be_placed(&board, x, y - 1) {
+                y -= 1;
+            } else {
+                shape.place(&mut board, x, y);
+                break;
+            }
+        }
+    }
+
+    unreachable!("The loop should never terminate");
+}
+
+#[aoc(day17, part1)]
+pub fn part1(input: &str) -> Result<usize, ParseIntError> {
+    Ok(height_after_n_shapes(input, 2022))
+}
+
+#[aoc(day17, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let CycleInfo {
+        cycle_count,
+        cycle_height,
+        first_cycle_shapes,
+        last_cycle_shapes,
+    } = get_cycle_info(input, 1_000_000_000_000);
+
+    Ok(
+        height_after_n_shapes(input, first_cycle_shapes + last_cycle_shapes)
+            + (cycle_height * cycle_count),
+    )
 }
 
 #[cfg(test)]
@@ -225,5 +319,11 @@ mod tests {
     fn test_case_1() {
         let result = super::part1(">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>");
         assert_eq!(result, Ok(3068));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2(">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>");
+        assert_eq!(result, Ok(1514285714288));
     }
 }
