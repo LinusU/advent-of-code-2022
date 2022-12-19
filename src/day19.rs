@@ -81,13 +81,26 @@ impl Blueprint {
         })
     }
 
-    fn max_geodes(&self) -> usize {
+    fn max_geodes(&self, time: u8) -> usize {
         let mut result = 0usize;
-        let mut queue = vec![Step::new()];
+        let mut queue = vec![Step::new(time)];
 
         while let Some(step) = queue.pop() {
             if step.time_left == 0 {
                 result = result.max(step.geodes);
+                continue;
+            }
+
+            if step.can_afford_always(&self.geode_robot_cost) {
+                let score = if step.can_afford(&self.geode_robot_cost) {
+                    step.score() + geode_robot_every_minute(step.time_left)
+                } else if step.time_left > 1 {
+                    step.score() + geode_robot_every_minute(step.time_left - 1)
+                } else {
+                    step.score()
+                };
+
+                result = result.max(score);
                 continue;
             }
 
@@ -131,9 +144,9 @@ struct Step {
 }
 
 impl Step {
-    fn new() -> Self {
+    fn new(time_left: u8) -> Self {
         Self {
-            time_left: 24,
+            time_left,
             ore: 0,
             clay: 0,
             obsidian: 0,
@@ -155,22 +168,30 @@ impl Step {
             && (self.obsidian + self.obsidian_robots) >= cost.obsidian
     }
 
-    fn best(&self, geode_robot_cost: &Cost) -> usize {
-        let base = self.geodes + (self.geode_robots * (self.time_left as usize));
+    fn can_afford_always(&self, cost: &Cost) -> bool {
+        self.ore_robots >= cost.ore
+            && self.clay_robots >= cost.clay
+            && self.obsidian_robots >= cost.obsidian
+    }
 
+    fn score(&self) -> usize {
+        self.geodes + (self.geode_robots * (self.time_left as usize))
+    }
+
+    fn best(&self, geode_robot_cost: &Cost) -> usize {
         if self.time_left > 1 && self.can_afford(geode_robot_cost) {
-            return base + geode_robot_every_minute(self.time_left);
+            return self.score() + geode_robot_every_minute(self.time_left);
         }
 
-        if self.time_left > 2 &&  self.can_afford_next(geode_robot_cost) {
-            return base + geode_robot_every_minute(self.time_left - 1);
+        if self.time_left > 2 && self.can_afford_next(geode_robot_cost) {
+            return self.score() + geode_robot_every_minute(self.time_left - 1);
         }
 
         if self.time_left > 3 {
-            return base + geode_robot_every_minute(self.time_left - 2);
+            return self.score() + geode_robot_every_minute(self.time_left - 2);
         }
 
-        base
+        self.score()
     }
 
     fn buy_robot(&self, robot_type: Resource, cost: &Cost) -> Self {
@@ -212,8 +233,23 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
 
     Ok(blueprints
         .par_iter()
-        .map(|blueprint| blueprint.id * blueprint.max_geodes())
+        .map(|blueprint| blueprint.id * blueprint.max_geodes(24))
         .sum())
+}
+
+#[aoc(day19, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let blueprints = input
+        .lines()
+        .take(3)
+        .map(Blueprint::parse)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    Ok(blueprints
+        .par_iter()
+        .map(|blueprint| blueprint.max_geodes(32))
+        .product())
 }
 
 #[cfg(test)]
@@ -230,5 +266,11 @@ mod tests {
     fn test_case_1() {
         let result = super::part1("Blueprint 1: Each ore robot costs 4 ore. Each clay robot costs 2 ore. Each obsidian robot costs 3 ore and 14 clay. Each geode robot costs 2 ore and 7 obsidian.\nBlueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsidian robot costs 3 ore and 8 clay. Each geode robot costs 3 ore and 12 obsidian.");
         assert_eq!(result, Ok(33));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("Blueprint 1: Each ore robot costs 4 ore. Each clay robot costs 2 ore. Each obsidian robot costs 3 ore and 14 clay. Each geode robot costs 2 ore and 7 obsidian.\nBlueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsidian robot costs 3 ore and 8 clay. Each geode robot costs 3 ore and 12 obsidian.");
+        assert_eq!(result, Ok(56 * 62));
     }
 }
