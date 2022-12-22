@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, num::ParseIntError, str::FromStr};
 use aoc_runner_derive::aoc;
 
 const ROOT: Name = Name(u32::from_be_bytes(*b"root"));
+const ME: Name = Name(u32::from_be_bytes(*b"humn"));
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Name(u32);
@@ -26,6 +27,16 @@ enum Job {
 }
 
 impl Job {
+    fn dependencies(&self) -> Option<(Name, Name)> {
+        match self {
+            Job::Static(_) => None,
+            Job::Add(lhs, rhs) => Some((*lhs, *rhs)),
+            Job::Sub(lhs, rhs) => Some((*lhs, *rhs)),
+            Job::Mul(lhs, rhs) => Some((*lhs, *rhs)),
+            Job::Div(lhs, rhs) => Some((*lhs, *rhs)),
+        }
+    }
+
     fn value(&self, known: &BTreeMap<Name, u64>) -> Option<u64> {
         match self {
             Job::Static(value) => Some(*value),
@@ -104,11 +115,95 @@ pub fn part1(input: &str) -> Result<u64, ParseIntError> {
     }
 }
 
+#[aoc(day21, part2)]
+pub fn part2(input: &str) -> Result<u64, ParseIntError> {
+    let mut monkeys = input
+        .lines()
+        .map(Monkey::from_str)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut known = BTreeMap::<Name, u64>::new();
+    let mut start_reverse_from = Option::<Name>::None;
+
+    while !known.contains_key(&ROOT) {
+        monkeys.retain(|monkey| {
+            if monkey.name == ME {
+                return true;
+            }
+
+            if monkey.name == ROOT {
+                let (lhs, rhs) = monkey.job.dependencies().unwrap();
+
+                if let Some(value) = known.get(&lhs).cloned() {
+                    known.insert(ROOT, value);
+                    known.insert(rhs, value);
+                    start_reverse_from = Some(rhs);
+                } else if let Some(value) = known.get(&rhs).cloned() {
+                    known.insert(ROOT, value);
+                    known.insert(lhs, value);
+                    start_reverse_from = Some(lhs);
+                }
+
+                return true;
+            }
+
+            if let Some(value) = monkey.job.value(&known) {
+                known.insert(monkey.name, value);
+                false
+            } else {
+                true
+            }
+        });
+    }
+
+    let monkeys = monkeys
+        .into_iter()
+        .map(|m| (m.name, m))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut current = start_reverse_from.unwrap();
+
+    while current != ME {
+        let result = known.get(&current).unwrap();
+        let monkey = monkeys.get(&current).unwrap();
+        let (lhs, rhs) = monkey.job.dependencies().unwrap();
+        let (lhs_value, rhs_value) = (known.get(&lhs).cloned(), known.get(&rhs).cloned());
+
+        let value = match (lhs_value, rhs_value, &monkey.job) {
+            (Some(x), None, Job::Add(_, _)) => result - x,
+            (None, Some(x), Job::Add(_, _)) => result - x,
+            (Some(x), None, Job::Sub(_, _)) => x - result,
+            (None, Some(x), Job::Sub(_, _)) => result + x,
+            (Some(x), None, Job::Mul(_, _)) => result / x,
+            (None, Some(x), Job::Mul(_, _)) => result / x,
+            (Some(x), None, Job::Div(_, _)) => x / result,
+            (None, Some(x), Job::Div(_, _)) => x * result,
+            _ => panic!("My algorithm is broken"),
+        };
+
+        if lhs_value.is_none() {
+            known.insert(lhs, value);
+            current = lhs;
+        } else {
+            known.insert(rhs, value);
+            current = rhs;
+        }
+    }
+
+    Ok(*known.get(&ME).unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_case_1() {
         let result = super::part1("root: pppw + sjmn\ndbpl: 5\ncczh: sllz + lgvd\nzczc: 2\nptdq: humn - dvpt\ndvpt: 3\nlfqf: 4\nhumn: 5\nljgn: 2\nsjmn: drzm * dbpl\nsllz: 4\npppw: cczh / lfqf\nlgvd: ljgn * ptdq\ndrzm: hmdt - zczc\nhmdt: 32");
         assert_eq!(result, Ok(152));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("root: pppw + sjmn\ndbpl: 5\ncczh: sllz + lgvd\nzczc: 2\nptdq: humn - dvpt\ndvpt: 3\nlfqf: 4\nhumn: 5\nljgn: 2\nsjmn: drzm * dbpl\nsllz: 4\npppw: cczh / lfqf\nlgvd: ljgn * ptdq\ndrzm: hmdt - zczc\nhmdt: 32");
+        assert_eq!(result, Ok(301));
     }
 }
