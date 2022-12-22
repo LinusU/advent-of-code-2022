@@ -85,7 +85,7 @@ impl Map {
         self.data.len() / self.width
     }
 
-    fn wrapping_add(&self, pos: (usize, usize), delta: (isize, isize)) -> (usize, usize) {
+    fn wrapping_add_2d(&self, pos: (usize, usize), delta: (isize, isize)) -> (usize, usize) {
         (
             pos.0.checked_add_signed(delta.0).unwrap_or(self.width - 1) % self.width,
             pos.1
@@ -93,6 +93,49 @@ impl Map {
                 .unwrap_or(self.height() - 1)
                 % self.height(),
         )
+    }
+
+    //   ABBH
+    //   CDDF
+    //   CD
+    //   EF
+    // CEEF
+    // AGGH
+    // AG
+    // BH
+    fn wrapping_add_3d(&self, pos: (usize, usize), dir: Direction) -> ((usize, usize), Direction) {
+        match (dir, pos.0, pos.1) {
+            // H - F
+            (Direction::East, 149, 0..50) => ((99, 149 - pos.1), Direction::West),
+            // D - F
+            (Direction::East, 99, 50..100) => ((100 + (pos.1 - 50), 49), Direction::North),
+            // F - H
+            (Direction::East, 99, 100..150) => ((149, 49 - (pos.1 - 100)), Direction::West),
+            // G - H
+            (Direction::East, 49, 150..200) => ((50 + (pos.1 - 150), 149), Direction::North),
+            // D - F
+            (Direction::South, 100..150, 49) => ((99, 50 + (pos.0 - 100)), Direction::West),
+            // G - H
+            (Direction::South, 50..100, 149) => ((49, 150 + (pos.0 - 50)), Direction::West),
+            // B - H
+            (Direction::South, 0..50, 199) => ((100 + pos.0, 0), Direction::South),
+            // A - C
+            (Direction::West, 50, 0..50) => ((0, 149 - pos.1), Direction::East),
+            // C - E
+            (Direction::West, 50, 50..100) => ((pos.1 - 50, 100), Direction::South),
+            // C - A
+            (Direction::West, 0, 100..150) => ((50, 49 - (pos.1 - 100)), Direction::East),
+            // A - B
+            (Direction::West, 0, 150..200) => ((50 + (pos.1 - 150), 0), Direction::South),
+            // A - B
+            (Direction::North, 50..100, 0) => ((0, 150 + (pos.0 - 50)), Direction::East),
+            // B - H
+            (Direction::North, 100..150, 0) => ((pos.0 - 100, 199), Direction::North),
+            // C - E
+            (Direction::North, 0..50, 100) => ((50, 50 + pos.0), Direction::East),
+            // inside
+            _ => (self.wrapping_add_2d(pos, dir.delta()), dir),
+        }
     }
 }
 
@@ -169,7 +212,7 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
         let delta = dir.delta();
 
         for _ in 0..distance {
-            let mut next = map.wrapping_add(pos, delta);
+            let mut next = map.wrapping_add_2d(pos, delta);
 
             let cell = map.get(next);
 
@@ -181,7 +224,7 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
                     break;
                 }
                 Cell::Void => loop {
-                    next = map.wrapping_add(next, delta);
+                    next = map.wrapping_add_2d(next, delta);
 
                     match map.get(next) {
                         Cell::Floor => {
@@ -194,6 +237,52 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
                         Cell::Void => {}
                     }
                 },
+            }
+        }
+    }
+
+    Ok((pos.1 + 1) * 1000 + (pos.0 + 1) * 4 + (dir as u8 as usize))
+}
+
+#[aoc(day22, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let (map, instructions) = input.split_once("\n\n").unwrap();
+
+    let map = Map::from_str(map)?;
+    let instructions = Instruction::parse_list(instructions).unwrap().1;
+
+    let mut pos = map.start();
+    let mut dir = Direction::East;
+
+    for instruction in instructions {
+        let distance = match instruction {
+            Instruction::TurnLeft => {
+                dir = dir.turn_left();
+                continue;
+            }
+            Instruction::TurnRight => {
+                dir = dir.turn_right();
+                continue;
+            }
+            Instruction::Forward(distance) => distance,
+        };
+
+        for _ in 0..distance {
+            let (next_pos, next_dir) = map.wrapping_add_3d(pos, dir);
+
+            let cell = map.get(next_pos);
+
+            match cell {
+                Cell::Floor => {
+                    pos = next_pos;
+                    dir = next_dir;
+                }
+                Cell::Wall => {
+                    break;
+                }
+                Cell::Void => {
+                    panic!("Stepped into the void {next_pos:?} from {pos:?} (dir={dir:?})")
+                }
             }
         }
     }

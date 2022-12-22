@@ -1,3 +1,4 @@
+#![feature(exclusive_range_pattern)]
 #![feature(generators, iter_from_generator)]
 
 extern crate aoc_runner;
