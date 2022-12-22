@@ -1,3 +1,5 @@
+#![feature(generators, iter_from_generator)]
+
 extern crate aoc_runner;
 
 #[macro_use]
@@ -26,5 +28,6 @@ mod day19;
 
 mod day20;
 mod day21;
+mod day22;
 
 aoc_lib! { year = 2022 }
