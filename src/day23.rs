@@ -217,11 +217,94 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     Ok(board.size() - board.elves())
 }
 
+#[aoc(day23, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let mut board = Board::from_str(input)?;
+
+    let directions = vec![
+        vec![
+            Direction::North,
+            Direction::South,
+            Direction::West,
+            Direction::East,
+        ],
+        vec![
+            Direction::South,
+            Direction::West,
+            Direction::East,
+            Direction::North,
+        ],
+        vec![
+            Direction::West,
+            Direction::East,
+            Direction::North,
+            Direction::South,
+        ],
+        vec![
+            Direction::East,
+            Direction::North,
+            Direction::South,
+            Direction::West,
+        ],
+    ];
+
+    for (idx, directions) in directions.iter().cycle().enumerate() {
+        let mut proposed = HashMap::<Pos, usize>::new();
+
+        for &elf in board.iter() {
+            if board.has_adjecent(&elf) {
+                for &dir in directions {
+                    if board.look(&elf, dir) == 0 {
+                        *proposed.entry(elf.go(dir)).or_insert(0) += 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        let mut next = HashSet::<Pos>::new();
+        let mut done = true;
+
+        'elf: for &elf in board.iter() {
+            if board.has_adjecent(&elf) {
+                done = false;
+
+                for &dir in directions {
+                    if board.look(&elf, dir) == 0 {
+                        if *proposed.get(&elf.go(dir)).unwrap() == 1 {
+                            next.insert(elf.go(dir));
+                            continue 'elf;
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            next.insert(elf);
+        }
+
+        if done {
+            return Ok(idx + 1);
+        }
+
+        board = Board(next);
+    }
+
+    panic!("Endless iterator ended");
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_case_1() {
         let result = super::part1("....#..\n..###.#\n#...#.#\n.#...##\n#.###..\n##.#.##\n.#..#..");
         assert_eq!(result, Ok(110));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("....#..\n..###.#\n#...#.#\n.#...##\n#.###..\n##.#.##\n.#..#..");
+        assert_eq!(result, Ok(20));
     }
 }
