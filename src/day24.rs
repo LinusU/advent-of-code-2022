@@ -2,6 +2,8 @@ use std::{collections::HashMap, fmt::Debug, num::ParseIntError, str::FromStr};
 
 use aoc_runner_derive::aoc;
 
+use crate::util::priority_queue::{PriorityQueue, PriorityQueueItem};
+
 fn lcm(a: usize, b: usize) -> usize {
     match (a, b) {
         (5, 5) => 5,
@@ -32,17 +34,6 @@ enum Blizzard {
     East,
 }
 
-impl Blizzard {
-    fn flipped(&self) -> Self {
-        match self {
-            Blizzard::North => Blizzard::South,
-            Blizzard::South => Blizzard::North,
-            Blizzard::West => Blizzard::East,
-            Blizzard::East => Blizzard::West,
-        }
-    }
-}
-
 #[derive(Clone)]
 struct Board {
     data: Vec<Vec<Blizzard>>,
@@ -50,10 +41,6 @@ struct Board {
 }
 
 impl Board {
-    fn is_free(&self, pos: Pos) -> bool {
-        self.data[pos.y * self.width + pos.x].is_empty()
-    }
-
     fn height(&self) -> usize {
         self.data.len() / self.width
     }
@@ -89,16 +76,6 @@ impl Board {
             data: next,
             width: self.width,
         }
-    }
-
-    fn flipped(&self) -> Board {
-        let mut data = Vec::with_capacity(self.data.len());
-
-        for cell in self.data.iter().rev() {
-            data.push(cell.iter().map(|b| b.flipped()).collect());
-        }
-
-        Board { data, width: self.width }
     }
 }
 
@@ -152,6 +129,43 @@ impl FromStr for Board {
     }
 }
 
+struct BoardStates {
+    data: Vec<Vec<bool>>,
+    width: usize,
+}
+
+impl BoardStates {
+    fn height(&self) -> usize {
+        self.data[0].len() / self.width
+    }
+
+    fn is_free(&self, cycle: usize, pos: Pos) -> bool {
+        self.data[cycle % self.data.len()][pos.y * self.width + pos.x]
+    }
+}
+
+impl From<Board> for BoardStates {
+    fn from(value: Board) -> Self {
+        let len = lcm(value.width, value.height());
+
+        let mut current = value;
+        let mut data = Vec::<Vec<bool>>::with_capacity(len);
+
+        loop {
+            data.push(current.data.iter().map(Vec::is_empty).collect());
+
+            if data.len() == len {
+                return Self {
+                    data,
+                    width: current.width,
+                };
+            }
+
+            current = current.next();
+        }
+    }
+}
+
 struct Step {
     minutes: usize,
     pos: Pos,
@@ -193,50 +207,46 @@ impl Step {
     }
 
     fn best_possible_time(&self, goal: Pos) -> usize {
-        let distance = (goal.x - self.pos.x) + (goal.y - self.pos.y);
-
-        self.minutes + distance
+        self.minutes + (goal.x.abs_diff(self.pos.x)) + (goal.y.abs_diff(self.pos.y))
     }
 }
 
-fn shortest_time_between(init: Board, first_cycle_index: usize) -> usize {
-    let bounds = (init.width, init.height());
+impl PriorityQueueItem<Pos> for Step {
+    fn cost(&self, context: &Pos) -> usize {
+        self.best_possible_time(*context)
+    }
+}
 
-    let start = Pos {
-        x: 0,
-        y: 0,
-    };
-
-    let goal = Pos {
-        x: bounds.0 - 1,
-        y: bounds.1 - 1,
-    };
-
+fn shortest_time_between(
+    states: &BoardStates,
+    start: Pos,
+    end: Pos,
+    first_cycle_index: usize,
+) -> usize {
+    let bounds = (states.width, states.height());
     let cycle_count = lcm(bounds.0, bounds.1);
 
-    let mut states = Vec::with_capacity(cycle_count);
+    let mut queue = PriorityQueue::<Pos, Step>::new(end);
 
-    states.push(init);
-
-    while states.len() < cycle_count {
-        let next = states.last().unwrap().next();
-        states.push(next);
-    }
-
-    let mut queue = Vec::<Step>::new();
-
-    for i in (0..cycle_count).rev() {
+    for i in 0..cycle_count {
         let minutes = i + first_cycle_index;
 
-        if states[minutes % cycle_count].is_free(start) {
-            queue.push(Step { minutes, pos: start });
+        if states.is_free(minutes, start) {
+            queue.push(Step {
+                minutes,
+                pos: start,
+            });
         }
     }
 
     let mut shortest_time = usize::MAX;
     let mut visited = HashMap::<(Pos, usize), usize>::new();
 
-    while let Some(step) = queue.pop() {
+    while let Some((cost, step)) = queue.pop() {
+        if cost >= shortest_time {
+            break;
+        }
+
         let cycle_index = step.minutes % cycle_count;
 
         if let Some(&last_time_at_this_position_in_cycle) = visited.get(&(step.pos, cycle_index)) {
@@ -247,18 +257,12 @@ fn shortest_time_between(init: Board, first_cycle_index: usize) -> usize {
 
         visited.insert((step.pos, cycle_index), step.minutes);
 
-        let next_board_state = &states[cycle_index];
-
-        if step.pos == goal {
+        if step.pos == end {
             shortest_time = shortest_time.min(step.minutes);
             continue;
         }
 
-        if step.best_possible_time(goal) >= shortest_time {
-            continue;
-        }
-
-        if next_board_state.is_free(step.pos) {
+        if states.is_free(cycle_index, step.pos) {
             queue.push(Step {
                 minutes: step.minutes + 1,
                 pos: step.pos,
@@ -266,11 +270,11 @@ fn shortest_time_between(init: Board, first_cycle_index: usize) -> usize {
         }
 
         for pos in step.neighbours(bounds) {
-            if next_board_state.is_free(pos) {
+            if states.is_free(cycle_index, pos) {
                 queue.push(Step {
                     minutes: step.minutes + 1,
                     pos,
-                })
+                });
             }
         }
     }
@@ -280,18 +284,32 @@ fn shortest_time_between(init: Board, first_cycle_index: usize) -> usize {
 
 #[aoc(day24, part1)]
 pub fn part1(input: &str) -> Result<usize, ParseIntError> {
-    let init = Board::from_str(input)?;
+    let states: BoardStates = Board::from_str(input)?.into();
 
-    Ok(shortest_time_between(init, 1))
+    let start = Pos { x: 0, y: 0 };
+
+    let end = Pos {
+        x: states.width - 1,
+        y: states.height() - 1,
+    };
+
+    Ok(shortest_time_between(&states, start, end, 1))
 }
 
 #[aoc(day24, part2)]
 pub fn part2(input: &str) -> Result<usize, ParseIntError> {
-    let init = Board::from_str(input)?;
+    let states: BoardStates = Board::from_str(input)?.into();
 
-    let first = shortest_time_between(init.clone(), 1);
-    let second = shortest_time_between(init.flipped(), first);
-    let third = shortest_time_between(init, second);
+    let start = Pos { x: 0, y: 0 };
+
+    let end = Pos {
+        x: states.width - 1,
+        y: states.height() - 1,
+    };
+
+    let first = shortest_time_between(&states, start, end, 1);
+    let second = shortest_time_between(&states, end, start, first);
+    let third = shortest_time_between(&states, start, end, second);
 
     Ok(third)
 }
