@@ -32,6 +32,18 @@ enum Blizzard {
     East,
 }
 
+impl Blizzard {
+    fn flipped(&self) -> Self {
+        match self {
+            Blizzard::North => Blizzard::South,
+            Blizzard::South => Blizzard::North,
+            Blizzard::West => Blizzard::East,
+            Blizzard::East => Blizzard::West,
+        }
+    }
+}
+
+#[derive(Clone)]
 struct Board {
     data: Vec<Vec<Blizzard>>,
     width: usize,
@@ -77,6 +89,16 @@ impl Board {
             data: next,
             width: self.width,
         }
+    }
+
+    fn flipped(&self) -> Board {
+        let mut data = Vec::with_capacity(self.data.len());
+
+        for cell in self.data.iter().rev() {
+            data.push(cell.iter().map(|b| b.flipped()).collect());
+        }
+
+        Board { data, width: self.width }
     }
 }
 
@@ -177,10 +199,14 @@ impl Step {
     }
 }
 
-#[aoc(day24, part1)]
-pub fn part1(input: &str) -> Result<usize, ParseIntError> {
-    let init = Board::from_str(input)?;
+fn shortest_time_between(init: Board, first_cycle_index: usize) -> usize {
     let bounds = (init.width, init.height());
+
+    let start = Pos {
+        x: 0,
+        y: 0,
+    };
+
     let goal = Pos {
         x: bounds.0 - 1,
         y: bounds.1 - 1,
@@ -200,14 +226,10 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     let mut queue = Vec::<Step>::new();
 
     for i in (0..cycle_count).rev() {
-        // Takes one minute to step onto the board
-        let minutes = i + 1;
+        let minutes = i + first_cycle_index;
 
-        if states[minutes % cycle_count].is_free(Pos { x: 0, y: 0 }) {
-            queue.push(Step {
-                minutes,
-                pos: Pos { x: 0, y: 0 },
-            });
+        if states[minutes % cycle_count].is_free(start) {
+            queue.push(Step { minutes, pos: start });
         }
     }
 
@@ -253,7 +275,25 @@ pub fn part1(input: &str) -> Result<usize, ParseIntError> {
         }
     }
 
-    Ok(shortest_time)
+    shortest_time
+}
+
+#[aoc(day24, part1)]
+pub fn part1(input: &str) -> Result<usize, ParseIntError> {
+    let init = Board::from_str(input)?;
+
+    Ok(shortest_time_between(init, 1))
+}
+
+#[aoc(day24, part2)]
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
+    let init = Board::from_str(input)?;
+
+    let first = shortest_time_between(init.clone(), 1);
+    let second = shortest_time_between(init.flipped(), first);
+    let third = shortest_time_between(init, second);
+
+    Ok(third)
 }
 
 #[cfg(test)]
@@ -262,5 +302,11 @@ mod tests {
     fn test_case_1() {
         let result = super::part1("#.######\n#>>.<^<#\n#.<..<<#\n#>v.><>#\n#<^v^^>#\n######.#");
         assert_eq!(result, Ok(18));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let result = super::part2("#.######\n#>>.<^<#\n#.<..<<#\n#>v.><>#\n#<^v^^>#\n######.#");
+        assert_eq!(result, Ok(54));
     }
 }
