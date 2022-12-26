@@ -7,6 +7,8 @@ use std::{
 
 use aoc_runner_derive::aoc;
 
+use crate::util::priority_queue::{PriorityQueue, PriorityQueueItem};
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ValveId(u16);
 
@@ -90,7 +92,7 @@ struct Part1Step {
     open: HashSet<u8>,
     position: ValveId,
     previous: ValveId,
-    score: u64,
+    score: usize,
     time_left: u8,
 }
 
@@ -115,7 +117,7 @@ impl Part1Step {
             open,
             position: self.position,
             previous: self.position,
-            score: self.score + ((valve.flow_rate as u64) * (time_left as u64)),
+            score: self.score + ((valve.flow_rate as usize) * (time_left as usize)),
             time_left,
         }
     }
@@ -134,8 +136,8 @@ impl Part1Step {
         !self.open.contains(&valve.flow_rate)
     }
 
-    fn best(&self, sorted_flow_rates: &[u8]) -> u64 {
-        let mut time_left = self.time_left as u64;
+    fn best(&self, sorted_flow_rates: &[u8]) -> usize {
+        let mut time_left = self.time_left as usize;
         let mut score = self.score;
 
         for &flow_rate in sorted_flow_rates {
@@ -148,7 +150,7 @@ impl Part1Step {
                 break;
             }
 
-            score += (flow_rate as u64) * time_left;
+            score += (flow_rate as usize) * time_left;
 
             time_left -= 1;
             if time_left == 0 {
@@ -161,7 +163,7 @@ impl Part1Step {
 }
 
 #[aoc(day16, part1)]
-pub fn part1(input: &str) -> Result<u64, ParseIntError> {
+pub fn part1(input: &str) -> Result<usize, ParseIntError> {
     let valves = input
         .lines()
         .map(Valve::from_str)
@@ -226,7 +228,7 @@ struct Part2Step {
     previous: ValveId,
     elephant_position: ValveId,
     elephant_previous: ValveId,
-    score: u64,
+    score: usize,
     time_left: u8,
 }
 
@@ -261,7 +263,7 @@ impl Part2Step {
             Move::Open(valve) => {
                 assert!(result.open.insert(valve.flow_rate));
                 result.position = valve.id;
-                result.score += (valve.flow_rate as u64) * (result.time_left as u64);
+                result.score += (valve.flow_rate as usize) * (result.time_left as usize);
             }
         }
 
@@ -272,7 +274,7 @@ impl Part2Step {
             Move::Open(valve) => {
                 assert!(result.open.insert(valve.flow_rate));
                 result.elephant_position = valve.id;
-                result.score += (valve.flow_rate as u64) * (result.time_left as u64);
+                result.score += (valve.flow_rate as usize) * (result.time_left as usize);
             }
         }
 
@@ -283,7 +285,7 @@ impl Part2Step {
         !self.open.contains(&valve.flow_rate)
     }
 
-    fn best(&self, sorted_flow_rates: &[u8]) -> u64 {
+    fn best(&self, sorted_flow_rates: &[u8]) -> usize {
         let mut time_left = self.time_left;
         let mut score = self.score;
 
@@ -299,7 +301,7 @@ impl Part2Step {
             }
 
             for &flow_rate in flow_rates {
-                score += (*flow_rate as u64) * (time_left as u64);
+                score += (*flow_rate as usize) * (time_left as usize);
             }
 
             time_left -= 1;
@@ -312,8 +314,14 @@ impl Part2Step {
     }
 }
 
+impl PriorityQueueItem<Vec<u8>> for Part2Step {
+    fn cost(&self, context: &Vec<u8>) -> usize {
+        usize::MAX - self.best(context)
+    }
+}
+
 #[aoc(day16, part2)]
-pub fn part2(input: &str) -> Result<u64, ParseIntError> {
+pub fn part2(input: &str) -> Result<usize, ParseIntError> {
     let valves = input
         .lines()
         .map(Valve::from_str)
@@ -334,9 +342,15 @@ pub fn part2(input: &str) -> Result<u64, ParseIntError> {
     sorted_flow_rates.reverse();
 
     let mut result = 0;
-    let mut queue = vec![Part2Step::new()];
+    let mut queue = PriorityQueue::<_, Part2Step>::new(sorted_flow_rates);
 
-    while let Some(step) = queue.pop() {
+    queue.push(Part2Step::new());
+
+    while let Some((cost, step)) = queue.pop() {
+        if (usize::MAX - cost) < result {
+            break;
+        }
+
         if step.time_left == 0 {
             result = result.max(step.score);
             continue;
@@ -344,10 +358,6 @@ pub fn part2(input: &str) -> Result<u64, ParseIntError> {
 
         if step.open.len() == max_open {
             result = result.max(step.score);
-            continue;
-        }
-
-        if step.best(&sorted_flow_rates) < result {
             continue;
         }
 
